@@ -1,0 +1,35 @@
+{
+  "name": "smart-lamp-load-tests",
+  "version": "1.0.0",
+  "description": "Load and performance testing suite for Smart Lamp Task Server",
+  "main": "stress-test.js",
+  "scripts": {
+    "test": "npm run test:stress",
+    "test:stress": "node stress-test.js",
+    "test:stress:light": "node stress-test.js --concurrency 5 --duration 30000",
+    "test:stress:medium": "node stress-test.js --concurrency 20 --duration 120000",
+    "test:stress:heavy": "node stress-test.js --concurrency 50 --duration 300000",
+    "test:autocannon": "node autocannon-test.js",
+    "monitor": "node monitor-server.js",
+    "report": "node generate-report.js",
+    "setup": ".\\setup-and-test.ps1 -SkipSetup",
+    "quick-test": ".\\setup-and-test.ps1 -TestType quick"
+  },
+  "keywords": [
+    "load-testing",
+    "performance",
+    "stress-testing",
+    "smart-lamp",
+    "nodejs",
+    "iot"
+  ],
+  "author": "Smart Lamp Team",
+  "license": "MIT",
+  "dependencies": {
+    "autocannon": "^7.15.0"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

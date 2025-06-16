@@ -1,0 +1,80 @@
+config:
+  target: 'http://localhost:8080'
+  phases:
+    # Quick smoke test
+    - duration: 30
+      arrivalRate: 5
+      name: "Quick smoke test"
+    # Short load burst
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 25
+      name: "Load burst"
+  
+  http:
+    timeout: 10
+    pool: 25
+
+scenarios:
+  # Health check (most frequent)
+  - name: "Health Check Only"
+    weight: 50
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+  # Registration test
+  - name: "Quick Registration"
+    weight: 25
+    flow:
+      - post:
+          url: "/api/auth/register"
+          headers:
+            Content-Type: "application/json"
+          json:
+            username: "quicktest_{{ $randomString() }}"
+            email: "quicktest_{{ $randomString() }}@test.com"
+            password: "QuickTest123"
+            firstName: "Quick"
+            lastName: "Test"
+          expect:
+            - statusCode: [201, 409]
+
+  # Login flow test
+  - name: "Quick Login Flow"
+    weight: 25
+    flow:
+      # Register first
+      - post:
+          url: "/api/auth/register"
+          headers:
+            Content-Type: "application/json"
+          json:
+            username: "loginflow_{{ $randomString() }}"
+            email: "loginflow_{{ $randomString() }}@test.com"
+            password: "QuickTest123"
+            firstName: "Login"
+            lastName: "Flow"
+          capture:
+            - json: "$.data.user.email"
+              as: "userEmail"
+            - json: "$.data.accessToken"
+              as: "accessToken"
+      # Get profile
+      - get:
+          url: "/api/auth/me"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+
+# Quick performance thresholds
+ensure:
+  p95: 800
+  p99: 1500
+  maxErrorRate: 10
+
+plugins:
+  expect: {}

@@ -1,0 +1,151 @@
+config:
+  target: 'http://localhost:8080'
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm-up"
+    # Ramp up phase
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp up"
+    # Sustained load
+    - duration: 120
+      arrivalRate: 50
+      name: "Sustained load"
+    # Peak load
+    - duration: 60
+      arrivalRate: 50
+      rampTo: 100
+      name: "Peak load"
+    # Cool down
+    - duration: 30
+      arrivalRate: 100
+      rampTo: 10
+      name: "Cool down"
+  
+  # HTTP configuration
+  http:
+    timeout: 30
+    pool: 50
+  
+  # Variables for test data
+  variables:
+    userEmail:
+      - "testuser1@example.com"
+      - "testuser2@example.com"
+      - "testuser3@example.com"
+      - "testuser4@example.com"
+      - "testuser5@example.com"
+    userName:
+      - "testuser1"
+      - "testuser2" 
+      - "testuser3"
+      - "testuser4"
+      - "testuser5"
+
+# Test scenarios
+scenarios:
+  # Health check scenario (lightweight)
+  - name: "Health Check"
+    weight: 30
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: "status"
+            - equals:
+                - "OK"
+                - "{{ status }}"
+
+  # User registration scenario
+  - name: "User Registration"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/register"
+          headers:
+            Content-Type: "application/json"
+          json:
+            username: "{{ userName }}_{{ $randomString() }}"
+            email: "{{ $randomString() }}@loadtest.com"
+            password: "TestPassword123"
+            firstName: "Load"
+            lastName: "Test"
+          expect:
+            - statusCode: [201, 409] # 201 success, 409 conflict (user exists)
+          capture:
+            - json: "$.data.accessToken"
+              as: "accessToken"
+
+  # User login scenario
+  - name: "User Login"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/register"
+          headers:
+            Content-Type: "application/json"
+          json:
+            username: "logintest_{{ $randomString() }}"
+            email: "logintest_{{ $randomString() }}@example.com"
+            password: "TestPassword123"
+            firstName: "Login"
+            lastName: "Test"
+          capture:
+            - json: "$.data.user.email"
+              as: "registeredEmail"
+      - post:
+          url: "/api/auth/login"
+          headers:
+            Content-Type: "application/json"
+          json:
+            email: "{{ registeredEmail }}"
+            password: "TestPassword123"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.accessToken"
+          capture:
+            - json: "$.data.accessToken"
+              as: "loginToken"
+
+  # Get profile scenario (authenticated)
+  - name: "Get User Profile"
+    weight: 20
+    flow:
+      # First register a user
+      - post:
+          url: "/api/auth/register"
+          headers:
+            Content-Type: "application/json"
+          json:
+            username: "profile_{{ $randomString() }}"
+            email: "profile_{{ $randomString() }}@example.com"
+            password: "TestPassword123"
+            firstName: "Profile"
+            lastName: "Test"
+          capture:
+            - json: "$.data.accessToken"
+              as: "token"
+      # Then get profile
+      - get:
+          url: "/api/auth/me"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.user"
+
+# Performance thresholds
+ensure:
+  p95: 500  # 95% of requests should complete within 500ms
+  p99: 1000 # 99% of requests should complete within 1000ms
+  maxErrorRate: 5 # Max 5% error rate
+
+# Reporting
+plugins:
+  expect: {}
+  metrics-by-endpoint:
+    useOnlyRequestNames: true
